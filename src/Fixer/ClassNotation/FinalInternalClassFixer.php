@@ -40,12 +40,12 @@ final class FinalInternalClassFixer extends AbstractFixer implements Configurati
         parent::configure($configuration);
 
         $intersect = array_intersect_assoc(
-            $this->configuration['annotation_white_list'],
-            $this->configuration['annotation_black_list']
+            $this->configuration['annotation_include'],
+            $this->configuration['annotation_exclude']
         );
 
         if (\count($intersect)) {
-            throw new InvalidFixerConfigurationException($this->getName(), sprintf('Annotation cannot be used in both the white- and black list, got duplicates: "%s".', implode('", "', array_keys($intersect))));
+            throw new InvalidFixerConfigurationException($this->getName(), sprintf('Annotation cannot be used in both the include and exclude list, got duplicates: "%s".', implode('", "', array_keys($intersect))));
         }
     }
 
@@ -61,7 +61,7 @@ final class FinalInternalClassFixer extends AbstractFixer implements Configurati
                 new CodeSample(
                     "<?php\n/** @CUSTOM */class A{}\n",
                     [
-                        'annotation_white_list' => ['@Custom'],
+                        'annotation_include' => ['@Custom'],
                     ]
                 ),
             ],
@@ -148,8 +148,8 @@ final class FinalInternalClassFixer extends AbstractFixer implements Configurati
 
         return new FixerConfigurationResolver([
             (new AliasedFixerOptionBuilder(
-                new FixerOptionBuilder('annotation_white_list', 'Class level annotations tags that must be set in order to fix the class. (case insensitive)'),
-                'annotation-white-list'
+                new FixerOptionBuilder('annotation_include', 'Class level annotations tags that must be set in order to fix the class. (case insensitive)'),
+                'annotation_white_list'
             ))
                 ->setAllowedTypes(['array'])
                 ->setAllowedValues($annotationsAsserts)
@@ -157,8 +157,8 @@ final class FinalInternalClassFixer extends AbstractFixer implements Configurati
                 ->setNormalizer($annotationsNormalizer)
                 ->getOption(),
             (new AliasedFixerOptionBuilder(
-                new FixerOptionBuilder('annotation_black_list', 'Class level annotations tags that must be omitted to fix the class, even if all of the white list ones are used as well. (case insensitive)'),
-                'annotation-black-list'
+                new FixerOptionBuilder('annotation_exclude', 'Class level annotations tags that must be omitted to fix the class, even if all of the included ones are used as well. (case insensitive)'),
+                'annotation_black_list'
             ))
                 ->setAllowedTypes(['array'])
                 ->setAllowedValues($annotationsAsserts)
@@ -204,18 +204,18 @@ final class FinalInternalClassFixer extends AbstractFixer implements Configurati
         foreach ($doc->getAnnotations() as $annotation) {
             Preg::match('/@\S+(?=\s|$)/', $annotation->getContent(), $matches);
             $tag = strtolower(substr(array_shift($matches), 1));
-            foreach ($this->configuration['annotation_black_list'] as $tagStart => $true) {
+            foreach ($this->configuration['annotation_exclude'] as $tagStart => $true) {
                 if (0 === strpos($tag, $tagStart)) {
-                    return false; // ignore class: class-level PHPDoc contains tag that has been black listed through configuration
+                    return false; // ignore class: class-level PHPDoc contains tag that has been excluded through configuration
                 }
             }
 
             $tags[$tag] = true;
         }
 
-        foreach ($this->configuration['annotation_white_list'] as $tag => $true) {
+        foreach ($this->configuration['annotation_include'] as $tag => $true) {
             if (!isset($tags[$tag])) {
-                return false; // ignore class: class-level PHPDoc does not contain all tags that has been white listed through configuration
+                return false; // ignore class: class-level PHPDoc does not contain all tags that has been included through configuration
             }
         }
 
